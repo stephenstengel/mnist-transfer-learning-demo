@@ -24,23 +24,28 @@ from tensorflow.keras import layers
 from keras.datasets import mnist		#images of digits.
 from keras.datasets import fashion_mnist  #images of clothes
 from keras.datasets import cifar10    #small images
-import tensorflow_datasets as tfds
+# ~ import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from skimage.transform import resize, rescale
 from skimage.color import gray2rgb
+from sklearn.model_selection import train_test_split
 
 print("Done!")
 
 def main(args):
 	print("Hello!")
 
+	tmpFolder = "./tmp/"
+	os.system("mkdir -p " + tmpFolder)
+	
+	
 	# ~ preamble()
 	epochsCat = 5
 	# ~ xceptCatDog(epochsCat)
 	
 	epochsMnist = 2
-	xceptionOnMnistExample(epochsMnist, fashion_mnist)
+	xceptionOnMnistExample(epochsMnist, fashion_mnist, tmpFolder)
 
 	return 0
 
@@ -49,31 +54,106 @@ def main(args):
 #learning on mnist. I'll cut down the classesin MNIST to just two to 
 #more closely match the tutorial I'm following and to match the problem
 #that we will be solving for the project.
-def xceptionOnMnistExample(epochsMnist, myDataset):
+def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder):
 	print("Creating datasets...")
 	############# work area
 	
-	train_ds, validation_ds = readDataset(myDataset)
+	train_ds, validation_ds, test_ds = readDataset(myDataset)
 	
 	print("Done!")
 	
 	
-	
-	print("Looking at a few of the images...")
-	plt.figure(figsize=(10, 10))
-	for images, labels in train_ds.take(1):
-		for i in tqdm(range(9)):
-			ax = plt.subplot(3, 3, i + 1)
-			plt.imshow(images[i].numpy().astype("float32"))
-			plt.title(int(labels[i]))
-			plt.axis("off")
-	plt.show() #THis line is needed for the pictures to actually show.
-	print("Done!")
-	
-	############### unchanged below
-	
+	############# this is the good one ################################################# good useful
+	# ~ print("Looking at a few of the images...")
+	# ~ plt.figure(figsize=(10, 10))
+	# ~ for images, labels in train_ds.take(1):
+		# ~ for i in tqdm(range(9)):
+			# ~ ax = plt.subplot(3, 3, i + 1)
+			# ~ plt.imshow(images[i].numpy().astype("float32"))
+			# ~ plt.title(int(labels[i]))
+			# ~ plt.axis("off")
+	# ~ plt.show() #THis line is needed for the pictures to actually show.
 	
 	print("Done!")
+	############################################
+
+	print("Done!")
+	print("Making the model...")
+	base_model = keras.applications.Xception(
+		weights="imagenet",  # Load weights pre-trained on ImageNet.
+		input_shape=(150, 150, 3),
+		include_top=False,
+	)  # Do not include the ImageNet classifier at the top.
+	
+	# Freeze the base_model
+	base_model.trainable = False
+	
+	# Create new model on top
+	inputs = keras.Input(shape=(150, 150, 3))
+	# ~ x = data_augmentation(inputs)  # Apply random data augmentation
+	# ~ x = inputs
+	x = layers.experimental.preprocessing.RandomFlip("horizontal")(inputs)
+	
+	# Pre-trained Xception weights requires that input be scaled
+	# from (0, 255) to a range of (-1., +1.), the rescaling layer
+	# outputs: `(inputs * scale) + offset`
+	scale_layer = keras.layers.experimental.preprocessing.Rescaling(scale=1 / 127.5, offset=-1)
+	x = scale_layer(x)
+	
+	# The base model contains batchnorm layers. We want to keep them in inference mode
+	# when we unfreeze the base model for fine-tuning, so we make sure that the
+	# base_model is running in inference mode here.
+	x = base_model(x, training=False)
+	x = keras.layers.GlobalAveragePooling2D()(x)
+	x = keras.layers.Dropout(0.2)(x)  # Regularize with dropout
+	outputs = keras.layers.Dense(1)(x)
+	model = keras.Model(inputs, outputs)
+	
+	model.summary()
+		
+	
+	
+	print("Done!")
+	
+	
+	#train
+	print("Training top layer...")
+	model.compile(
+		optimizer=keras.optimizers.Adam(),
+		loss=keras.losses.BinaryCrossentropy(from_logits=True),
+		metrics=[keras.metrics.BinaryAccuracy()],
+	)
+	
+	# ~ epochs = 20
+	epochs = epochsMnist
+	print("train_ds: " + str(train_ds))
+	# ~ print("train_ds shape: " + str(train_ds.shape))
+	myHistory = model.fit(train_ds, epochs=epochs, validation_data=validation_ds)
+	
+	print("Done!")
+	# ~ image_size = (150, 150)
+	# ~ img = keras.preprocessing.image.load_img(
+		# ~ "PetImages/Cat/6779.jpg", target_size=image_size ##################THIS NEEDS TO BE A FASHION
+	# ~ )
+	# ~ img_array = keras.preprocessing.image.img_to_array(img)
+	# ~ img_array = tf.expand_dims(img_array, 0)  # Create batch axis
+	
+	# ~ predictions = model.predict(img_array)
+	predictions = model.predict(test_ds)
+	score = predictions[0]
+	print("predictions: " + str(predictions))
+	print("score: " + str(score))
+	print(
+		"This image is %.2f percent thing and %.2f percent thing2."
+		% (100 * (1 - score), 100 * score)
+	)
+	
+	scores = model.evaluate(test_ds)
+	print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+	
+	performEvaluation(myHistory, tmpFolder)
+	
+	############################################
 	print("HORAAAAAYYYYY")
 	
 
@@ -85,38 +165,83 @@ def readDataset( myDataset ):
 	StartTime = time.time()
 	(x_train, y_train), (x_test, y_test) = myDataset.load_data()
 	
-	#testing
+	#testing ######################################## cut set ######################################
+	#Full set is too much memory with these lists
 	cutNum = 1000
 	x_train = x_train[:cutNum]
 	y_train = y_train[:cutNum]
 	x_test = x_test[:cutNum]
 	y_test = y_test[:cutNum]
+	#######
 	
-	# ~ x_train = x_train.astype('float32') / 255.
-	# ~ x_test = x_test.astype('float32') / 255.
+	#make validation set from training data.
+	sliceidx = int(len(x_train) * 0.8)
+	x_val = x_train[sliceidx:]
+	x_train = x_train[:sliceidx]
+	
+	sliceidx = int(len(y_train) * 0.8)
+	y_val = y_train[sliceidx:]
+	y_train = y_train[:sliceidx]
+	
+	
+	
 	
 	print("SHAPES:...")
 	print(x_train.shape,y_train.shape)
 	print(x_test.shape, y_test.shape)
+	print(x_val.shape, y_val.shape)
+	
+	ANKLE_BOOT = 9
+	T_SHIRT = 0
 	
 	size = (150, 150)
 	# ~ size = (28, 28)
 	newxtrain = []
+	newytrain = []
 	for i in tqdm(range(len(x_train))):
-		newxtrain.append(gray2rgb(resize(x_train[i], size)) )
+		if y_train[i] == ANKLE_BOOT or y_train[i] == T_SHIRT:
+			# ~ print("ankle boot lol")
+			newxtrain.append(gray2rgb(resize(x_train[i], size)) )
+			newytrain.append(y_train[i])
 	x_train = np.asarray(newxtrain)
+	y_train = np.asarray(newytrain)
+
 	newxtest = []
+	newytest = []
 	for i in tqdm(range(len(x_test))):
-		newxtest.append( gray2rgb(resize(x_test[i], size)) )
+		if y_test[i] == ANKLE_BOOT or y_test[i] == T_SHIRT:
+			newxtest.append( gray2rgb(resize(x_test[i], size)) )
+			newytest.append(y_test[i])
 	x_test = np.asarray(newxtest)
+	y_test = np.asarray(newytest)
+
+	newxval = []
+	newyval = []
+	for i in tqdm(range(len(x_val))):
+		if y_val[i] == ANKLE_BOOT or y_val[i] == T_SHIRT:
+			newxval.append( gray2rgb(resize(x_val[i], size)) )
+			newyval.append(y_val[i])
+	x_val = np.asarray(newxval)
+	y_val = np.asarray(newyval)
+	
+	
+	print("SHAPES after selection of two classes...")
+	print(x_train.shape,y_train.shape)
+	print(x_test.shape, y_test.shape)
+	print(x_val.shape, y_val.shape)
+	
+	#lengths must be same?
 	
 	train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
 	val_ds   = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+	realval_ds   = tf.data.Dataset.from_tensor_slices((x_val, y_val))
 	
 	BATCH_SIZE = 64
-	# ~ dataset = dataset.repeat().batch(BATCH_SIZE)
-	train_ds = train_ds.repeat().batch(BATCH_SIZE, drop_remainder=False) ############
-	val_ds = val_ds.repeat().batch(BATCH_SIZE, drop_remainder=False)
+	# ~ train_ds = train_ds.repeat().batch(BATCH_SIZE, drop_remainder=False) ############
+	# ~ val_ds = val_ds.repeat().batch(BATCH_SIZE, drop_remainder=False)
+	train_ds = train_ds.batch(BATCH_SIZE, drop_remainder=False) ############
+	val_ds = val_ds.batch(BATCH_SIZE, drop_remainder=False)
+	realval_ds = realval_ds.batch(BATCH_SIZE, drop_remainder=False)
 	
 	
 	
@@ -138,6 +263,7 @@ def readDataset( myDataset ):
 	# ~ x_test = x_test.prefetch(buffer_size=32)
 	train_ds = train_ds.prefetch(buffer_size=32)
 	val_ds = val_ds.prefetch(buffer_size=32)
+	realval_ds = realval_ds.prefetch(buffer_size=32)
 	
 	#Get the time
 	EndTime = time.time()
@@ -146,7 +272,9 @@ def readDataset( myDataset ):
 	# ~ return x_train, x_test
 	# ~ return (x_train, y_train), (x_test, y_test)
 	print("WORKSOFAR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-	return train_ds, val_ds
+	
+	#realval_ds is the dataset for validation. val_ds is actually the test set. change names later.
+	return train_ds, realval_ds, val_ds
 
 
 #Example of using a pretrained network with weights, adding a bit to the
@@ -564,6 +692,36 @@ def preamble():
 	
 	
 	print("\n\n\n\n#########################################################")
+
+#my evaluation grapher thingy
+def performEvaluation(history, tmpFolder):
+	print("Performing evaluation...###############################################################")
+	print("history...")
+	print(history)
+	print("history.history...")
+	print(history.history)
+	
+	accuracy = history.history["binary_accuracy"]
+	val_accuracy = history.history["val_binary_accuracy"]
+	
+	loss = history.history["loss"]
+	val_loss = history.history["val_loss"]
+	epochs = range(1, len(accuracy) + 1)
+	plt.plot(epochs, accuracy, "o", label="Training accuracy")
+	plt.plot(epochs, val_accuracy, "^", label="Validation accuracy")
+	# ~ plt.plot(epochs, jaccInd, "*", label="Jaccard Index")
+	# ~ plt.plot(epochs, diceInd, "D", label="Dice Index")
+	plt.title("Training and validation accuracy")
+	plt.legend()
+	plt.savefig(tmpFolder + "trainvalacc.png")
+	plt.clf()
+	
+	plt.plot(epochs, loss, "o", label="Training loss")
+	plt.plot(epochs, val_loss, "^", label="Validation loss")
+	plt.title("Training and validation loss")
+	plt.legend()
+	plt.savefig(tmpFolder + "trainvalloss.png")
+	plt.clf()
 
 
 if __name__ == '__main__':
