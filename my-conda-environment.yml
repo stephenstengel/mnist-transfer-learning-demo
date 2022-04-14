@@ -36,18 +36,21 @@ dependencies:
   - dask-core=2022.2.1=pyhd3eb1b0_0
   - dataclasses=0.8=pyh6d0b6a4_7
   - dbus=1.13.18=hb2f20db_0
+  - dill=0.3.4=pyhd3eb1b0_0
   - expat=2.4.4=h295c915_0
   - fontconfig=2.13.1=h6c09931_0
   - fonttools=4.25.0=pyhd3eb1b0_0
   - freetype=2.11.0=h70c0345_0
   - frozenlist=1.2.0=py39h7f8727e_0
   - fsspec=2022.2.0=pyhd3eb1b0_0
+  - future=0.18.2=py39h06a4308_1
   - gast=0.4.0=pyhd3eb1b0_0
   - giflib=5.2.1=h7b6447c_0
   - glib=2.69.1=h4ff587b_1
   - google-auth=2.6.0=pyhd3eb1b0_0
   - google-auth-oauthlib=0.4.4=pyhd3eb1b0_0
   - google-pasta=0.2.0=pyhd3eb1b0_0
+  - googleapis-common-protos=1.53.0=py39h06a4308_0
   - grpcio=1.42.0=py39hce63b2e_0
   - gst-plugins-base=1.14.0=h8213a91_2
   - gstreamer=1.14.0=h28cd5cc_2
@@ -116,7 +119,9 @@ dependencies:
   - pcre=8.45=h295c915_0
   - pillow=9.0.1=py39h22f2fdc_0
   - pip=21.2.4=py39h06a4308_0
+  - promise=2.3=py39h06a4308_0
   - protobuf=3.19.1=py39h295c915_0
+  - psutil=5.8.0=py39h27cfd23_1
   - pyasn1=0.4.8=pyhd3eb1b0_0
   - pyasn1-modules=0.2.8=py_0
   - pycparser=2.21=pyhd3eb1b0_0
@@ -147,7 +152,9 @@ dependencies:
   - tensorboard-plugin-wit=1.6.0=py_0
   - tensorflow=2.4.1=mkl_py39h4683426_0
   - tensorflow-base=2.4.1=mkl_py39h43e0292_0
+  - tensorflow-datasets=1.2.0=py39h06a4308_0
   - tensorflow-estimator=2.6.0=pyh7b7c402_0
+  - tensorflow-metadata=0.14.0=pyhe6710b0_1
   - termcolor=1.1.0=py39h06a4308_1
   - threadpoolctl=2.2.0=pyh0d69192_0
   - tifffile=2021.7.2=pyhd3eb1b0_2
