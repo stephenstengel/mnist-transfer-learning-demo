@@ -97,14 +97,12 @@ def xceptCatDog():
 	
 	print("Viewing and Augmenting data...")
 	#Need to use experimental tag because my conda instaled tensorflow 2.4
-	data_augmentation = keras.Sequential(
-		[
-			# ~ layers.RandomFlip("horizontal"),
-			layers.experimental.preprocessing.RandomFlip("horizontal"),
-			# ~ layers.RandomRotation(0.1),
-			layers.experimental.preprocessing.RandomRotation(0.1),
-		]
-	)
+	# ~ data_augmentation = keras.Sequential(
+		# ~ [
+			# ~ layers.experimental.preprocessing.RandomFlip("horizontal"),
+			# ~ layers.experimental.preprocessing.RandomRotation(0.1),
+		# ~ ]
+	# ~ )
 	
 	#comment to faster lol
 	# ~ plt.figure(figsize=(10, 10))
@@ -118,16 +116,92 @@ def xceptCatDog():
 	
 	print("Done!")
 	
+	##### Back to the original tutorial ######
+	print("Preprocessing...")
+	# ~ train_ds = train_ds.prefetch(buffer_size=32)
+	# ~ val_ds = val_ds.prefetch(buffer_size=32)
 	
-	print("Preprocessing?...")
-	train_ds = train_ds.prefetch(buffer_size=32)
-	val_ds = val_ds.prefetch(buffer_size=32)
+	size = (150, 150)
+	train_ds = train_ds.map(lambda x, y: (tf.image.resize(x, size), y))
+	validation_ds = val_ds.map(lambda x, y: (tf.image.resize(x, size), y)) #RENAME val_ds
+
+	####### This makes the shapes wonky and causes crash.
+	# ~ batch_size = 32
+	# ~ train_ds = train_ds.cache().batch(batch_size).prefetch(buffer_size=10)
+	# ~ validation_ds = validation_ds.cache().batch(batch_size).prefetch(buffer_size=10)
+	
+	#test
+	# ~ data_augmentation = keras.Sequential(
+		# ~ [layers.experimental.preprocessing.RandomFlip("horizontal"), layers.experimental.preprocessing.RandomRotation(0.1),]
+	# ~ )
+	# ~ for images, labels in train_ds.take(1):
+		# ~ plt.figure(figsize=(10, 10))
+		# ~ first_image = images[0]
+		# ~ for i in range(9):
+			# ~ ax = plt.subplot(3, 3, i + 1)
+			# ~ augmented_image = data_augmentation(
+				# ~ tf.expand_dims(first_image, 0), training=True
+			# ~ )
+			# ~ plt.imshow(augmented_image[0].numpy().astype("int32"))
+			# ~ plt.title(int(labels[0]))
+			# ~ plt.axis("off")	
+	# ~ plt.show()
+	
+	
+	
 	print("Done!")
 	print("Making the model...")
-	model = make_model(input_shape=image_size + (3,), num_classes=2)
-	keras.utils.plot_model(model, show_shapes=True)
+	base_model = keras.applications.Xception(
+		weights="imagenet",  # Load weights pre-trained on ImageNet.
+		input_shape=(150, 150, 3),
+		include_top=False,
+	)  # Do not include the ImageNet classifier at the top.
+	
+	# Freeze the base_model
+	base_model.trainable = False
+	
+	# Create new model on top
+	inputs = keras.Input(shape=(150, 150, 3))
+	# ~ x = data_augmentation(inputs)  # Apply random data augmentation
+	# ~ x = inputs
+	x = layers.experimental.preprocessing.RandomFlip("horizontal")(inputs)
+	
+	# Pre-trained Xception weights requires that input be scaled
+	# from (0, 255) to a range of (-1., +1.), the rescaling layer
+	# outputs: `(inputs * scale) + offset`
+	scale_layer = keras.layers.experimental.preprocessing.Rescaling(scale=1 / 127.5, offset=-1)
+	x = scale_layer(x)
+	
+	# The base model contains batchnorm layers. We want to keep them in inference mode
+	# when we unfreeze the base model for fine-tuning, so we make sure that the
+	# base_model is running in inference mode here.
+	x = base_model(x, training=False)
+	x = keras.layers.GlobalAveragePooling2D()(x)
+	x = keras.layers.Dropout(0.2)(x)  # Regularize with dropout
+	outputs = keras.layers.Dense(1)(x)
+	model = keras.Model(inputs, outputs)
+	
+	model.summary()
+		
+	
+	
 	print("Done!")
 	
+	
+	#train
+	print("Training top layer...")
+	model.compile(
+		optimizer=keras.optimizers.Adam(),
+		loss=keras.losses.BinaryCrossentropy(from_logits=True),
+		metrics=[keras.metrics.BinaryAccuracy()],
+	)
+	
+	epochs = 20
+	print("train_ds: " + str(train_ds))
+	# ~ print("train_ds shape: " + str(train_ds.shape))
+	model.fit(train_ds, epochs=epochs, validation_data=validation_ds)
+	
+	print("Done!")
 	
 
 
