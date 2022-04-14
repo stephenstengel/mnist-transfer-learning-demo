@@ -20,6 +20,7 @@ from tensorflow import keras
 from keras.datasets import mnist		#images of digits.
 from keras.datasets import fashion_mnist  #images of clothes
 from keras.datasets import cifar10    #small images
+import tensorflow_datasets as tfds
 
 print("Done!")
 
@@ -27,9 +28,25 @@ def main(args):
 	# ~ preamble()
 	
 	print("heh")
-
+	xceptCatDog()
 
 	return 0
+
+def xceptCatDog():
+	# ~ tfds.disable_progress_bar()
+	
+	train_ds, validation_ds, test_ds = tfds.load(
+		"cats_vs_dogs",
+		# Reserve 10% for validation and 10% for test
+		split=["train[:40%]", "train[40%:50%]", "train[50%:60%]"],
+		as_supervised=True,  # Include labels
+	)
+	
+	print("Number of training samples: %d" % tf.data.experimental.cardinality(train_ds))
+	print(
+		"Number of validation samples: %d" % tf.data.experimental.cardinality(validation_ds)
+	)
+	print("Number of test samples: %d" % tf.data.experimental.cardinality(test_ds))
 
 
 def preamble():
