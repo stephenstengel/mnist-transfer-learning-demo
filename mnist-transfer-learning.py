@@ -41,10 +41,13 @@ def xceptCatDog():
 	#Starting by importing the dataset manually because the first tutorial just doesn't compile.
 	#Using this other tutorial: https://keras.io/examples/vision/image_classification_from_scratch/
 	
+	# ~ imagesTopFolderName = "PetImages"
+	imagesTopFolderName = "shorter-pet-images"
+	
 	print("Cleaning out images that the tutorial doesn't like.")
 	num_skipped = 0
 	for folder_name in ("Cat", "Dog"):
-		folder_path = os.path.join("PetImages", folder_name)
+		folder_path = os.path.join(imagesTopFolderName, folder_name)
 		for fname in tqdm(os.listdir(folder_path)):
 			fpath = os.path.join(folder_path, fname)
 			try:
@@ -66,7 +69,7 @@ def xceptCatDog():
 	batch_size = 32
 	
 	train_ds = tf.keras.preprocessing.image_dataset_from_directory(
-		"PetImages",
+		imagesTopFolderName,
 		validation_split=0.2,
 		subset="training",
 		seed=1337,
@@ -74,7 +77,7 @@ def xceptCatDog():
 		batch_size=batch_size,
 	)
 	val_ds = tf.keras.preprocessing.image_dataset_from_directory(
-		"PetImages",
+		imagesTopFolderName,
 		validation_split=0.2,
 		subset="validation",
 		seed=1337,
@@ -129,6 +132,10 @@ def xceptCatDog():
 	# ~ batch_size = 32
 	# ~ train_ds = train_ds.cache().batch(batch_size).prefetch(buffer_size=10)
 	# ~ validation_ds = validation_ds.cache().batch(batch_size).prefetch(buffer_size=10)
+	
+	#This simpler way works fine it seems. (I haven't gotten past one epoch yet. I need o pare down the data still.
+	train_ds = train_ds.prefetch(buffer_size=32)
+	validation_ds = validation_ds.prefetch(buffer_size=32)
 	
 	#test
 	# ~ data_augmentation = keras.Sequential(
