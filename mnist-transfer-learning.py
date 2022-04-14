@@ -7,6 +7,7 @@
 
 #A test program to see how transfer learning works.
 #Tutorial sources:
+# ~ https://keras.io/examples/vision/image_classification_from_scratch/
 # ~ https://keras.io/guides/transfer_learning/
 # ~ https://towardsdatascience.com/transfer-learning-using-pre-trained-alexnet-model-and-fashion-mnist-43898c2966fb?gi=1f9cc1728578
 # ~ https://www.kaggle.com/code/muerbingsha/mnist-vgg19/notebook
@@ -14,13 +15,17 @@
 
 print("Running imports...")
 
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from tensorflow.keras import layers
 from keras.datasets import mnist		#images of digits.
 from keras.datasets import fashion_mnist  #images of clothes
 from keras.datasets import cifar10    #small images
 import tensorflow_datasets as tfds
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 print("Done!")
 
@@ -33,20 +38,155 @@ def main(args):
 	return 0
 
 def xceptCatDog():
-	# ~ tfds.disable_progress_bar()
+	#Starting by importing the dataset manually because the first tutorial just doesn't compile.
+	#Using this other tutorial: https://keras.io/examples/vision/image_classification_from_scratch/
 	
-	train_ds, validation_ds, test_ds = tfds.load(
-		"cats_vs_dogs",
-		# Reserve 10% for validation and 10% for test
-		split=["train[:40%]", "train[40%:50%]", "train[50%:60%]"],
-		as_supervised=True,  # Include labels
+	print("Cleaning out images that the tutorial doesn't like.")
+	num_skipped = 0
+	for folder_name in ("Cat", "Dog"):
+		folder_path = os.path.join("PetImages", folder_name)
+		for fname in tqdm(os.listdir(folder_path)):
+			fpath = os.path.join(folder_path, fname)
+			try:
+				fobj = open(fpath, "rb")
+				is_jfif = tf.compat.as_bytes("JFIF") in fobj.peek(10)
+			finally:
+				fobj.close()
+	
+			if not is_jfif:
+				num_skipped += 1
+				# Delete corrupted image
+				os.remove(fpath)
+	
+	print("Deleted %d images" % num_skipped)
+	
+	print("Creating datasets...")
+	
+	image_size = (180, 180)
+	batch_size = 32
+	
+	train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+		"PetImages",
+		validation_split=0.2,
+		subset="training",
+		seed=1337,
+		image_size=image_size,
+		batch_size=batch_size,
+	)
+	val_ds = tf.keras.preprocessing.image_dataset_from_directory(
+		"PetImages",
+		validation_split=0.2,
+		subset="validation",
+		seed=1337,
+		image_size=image_size,
+		batch_size=batch_size,
 	)
 	
-	print("Number of training samples: %d" % tf.data.experimental.cardinality(train_ds))
-	print(
-		"Number of validation samples: %d" % tf.data.experimental.cardinality(validation_ds)
+	print("Done!")
+	
+	# ~ print("Looking at a few of the images...")
+	# ~ plt.figure(figsize=(10, 10))
+	# ~ for images, labels in train_ds.take(1):
+		# ~ for i in tqdm(range(9)):
+			# ~ ax = plt.subplot(3, 3, i + 1)
+			# ~ plt.imshow(images[i].numpy().astype("uint8"))
+			# ~ plt.title(int(labels[i]))
+			# ~ plt.axis("off")
+	# ~ plt.show() #THis line is needed for the pictures to actually show.
+	# ~ print("Done!")
+	
+	print("Viewing and Augmenting data...")
+	#Need to use experimental tag because my conda instaled tensorflow 2.4
+	data_augmentation = keras.Sequential(
+		[
+			# ~ layers.RandomFlip("horizontal"),
+			layers.experimental.preprocessing.RandomFlip("horizontal"),
+			# ~ layers.RandomRotation(0.1),
+			layers.experimental.preprocessing.RandomRotation(0.1),
+		]
 	)
-	print("Number of test samples: %d" % tf.data.experimental.cardinality(test_ds))
+	
+	#comment to faster lol
+	# ~ plt.figure(figsize=(10, 10))
+	# ~ for images, _ in train_ds.take(1):
+		# ~ for i in tqdm(range(9)):
+			# ~ augmented_images = data_augmentation(images)
+			# ~ ax = plt.subplot(3, 3, i + 1)
+			# ~ plt.imshow(augmented_images[0].numpy().astype("uint8"))
+			# ~ plt.axis("off")
+	# ~ plt.show()
+	
+	print("Done!")
+	
+	
+	print("Preprocessing?...")
+	train_ds = train_ds.prefetch(buffer_size=32)
+	val_ds = val_ds.prefetch(buffer_size=32)
+	print("Done!")
+	print("Making the model...")
+	model = make_model(input_shape=image_size + (3,), num_classes=2)
+	keras.utils.plot_model(model, show_shapes=True)
+	print("Done!")
+	
+	
+
+
+#an xception model.
+def make_model(input_shape, num_classes):
+	inputs = keras.Input(shape=input_shape)
+	# Image augmentation block
+	# ~ x = data_augmentation(inputs) #BUGGY
+	
+	#convert to functional or whatever.
+	x = layers.experimental.preprocessing.RandomFlip("horizontal")(inputs)
+	# ~ x = layers.experimental.preprocessing.RandomRotation(0.1)(x) #Buggy
+	
+	# Entry block
+	x = layers.experimental.preprocessing.Rescaling(1.0 / 255)(x)
+	x = layers.Conv2D(32, 3, strides=2, padding="same")(x)
+	x = layers.BatchNormalization()(x)
+	x = layers.Activation("relu")(x)
+
+	x = layers.Conv2D(64, 3, padding="same")(x)
+	x = layers.BatchNormalization()(x)
+	x = layers.Activation("relu")(x)
+
+	previous_block_activation = x  # Set aside residual
+
+	for size in [128, 256, 512, 728]:
+		x = layers.Activation("relu")(x)
+		x = layers.SeparableConv2D(size, 3, padding="same")(x)
+		x = layers.BatchNormalization()(x)
+
+		x = layers.Activation("relu")(x)
+		x = layers.SeparableConv2D(size, 3, padding="same")(x)
+		x = layers.BatchNormalization()(x)
+
+		x = layers.MaxPooling2D(3, strides=2, padding="same")(x)
+
+		# Project residual
+		residual = layers.Conv2D(size, 1, strides=2, padding="same")(
+			previous_block_activation
+		)
+		x = layers.add([x, residual])  # Add back residual
+		previous_block_activation = x  # Set aside next residual
+
+	x = layers.SeparableConv2D(1024, 3, padding="same")(x)
+	x = layers.BatchNormalization()(x)
+	x = layers.Activation("relu")(x)
+
+	x = layers.GlobalAveragePooling2D()(x)
+	if num_classes == 2:
+		activation = "sigmoid"
+		units = 1
+	else:
+		activation = "softmax"
+		units = num_classes
+
+	x = layers.Dropout(0.5)(x)
+	outputs = layers.Dense(units, activation=activation)(x)
+	
+	return keras.Model(inputs, outputs)
 
 
 def preamble():
