@@ -1,0 +1,5 @@
+This is just a demo program to learn how to use transfer learning in keras.
+
+Import the conda environment with: conda env create -f my-conda-environment.yml
+
+Stephen Stengel <stephen.stengel@cwu.edu> 2022
