@@ -36,16 +36,20 @@ print("Done!")
 def main(args):
 	print("Hello!")
 
-	tmpFolder = "./tmp/"
-	os.system("mkdir -p " + tmpFolder)
+	dFolder = "./digits/"
+	os.system("mkdir -p " + dFolder)
+	fFolder = "./fashion/"
+	os.system("mkdir -p " + fFolder)
 	
 	
 	# ~ preamble()
 	epochsCat = 5
 	# ~ xceptCatDog(epochsCat)
 	
-	epochsMnist = 2
-	xceptionOnMnistExample(epochsMnist, fashion_mnist, tmpFolder)
+	epochsMnist = 100
+	sliceNum = 2000
+	xceptionOnMnistExample(epochsMnist, fashion_mnist, fFolder, sliceNum)
+	xceptionOnMnistExample(epochsMnist, mnist, dFolder, sliceNum)
 
 	return 0
 
@@ -54,11 +58,11 @@ def main(args):
 #learning on mnist. I'll cut down the classesin MNIST to just two to 
 #more closely match the tutorial I'm following and to match the problem
 #that we will be solving for the project.
-def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder):
+def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder, sliceNum):
 	print("Creating datasets...")
 	############# work area
 	
-	train_ds, validation_ds, test_ds = readDataset(myDataset)
+	train_ds, validation_ds, test_ds = readDataset(myDataset, sliceNum)
 	
 	print("Done!")
 	
@@ -159,15 +163,21 @@ def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder):
 
 #This reads the specified dataset into memory.
 #Try: mnist, fashion_mnist, cifar10
-def readDataset( myDataset ):
+def readDataset( myDataset, sliceNum ):
 	print("Start reading the data ...")
 	# Get the time
 	StartTime = time.time()
 	(x_train, y_train), (x_test, y_test) = myDataset.load_data()
 	
+	# ~ rng = np.random.default_rng()
+	# ~ rng.shuffle(x_train)
+	# ~ rng.shuffle(y_train)
+	# ~ rng.shuffle(x_test)
+	# ~ rng.shuffle(y_test)
+	
 	#testing ######################################## cut set ######################################
 	#Full set is too much memory with these lists
-	cutNum = 1000
+	cutNum = sliceNum
 	x_train = x_train[:cutNum]
 	y_train = y_train[:cutNum]
 	x_test = x_test[:cutNum]
