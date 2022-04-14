@@ -28,6 +28,7 @@ import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from skimage.transform import resize, rescale
+from skimage.color import gray2rgb
 
 print("Done!")
 
@@ -102,11 +103,11 @@ def readDataset( myDataset ):
 	# ~ size = (28, 28)
 	newxtrain = []
 	for i in tqdm(range(len(x_train))):
-		newxtrain.append(resize(x_train[i], size) )
+		newxtrain.append(gray2rgb(resize(x_train[i], size)) )
 	x_train = np.asarray(newxtrain)
 	newxtest = []
 	for i in tqdm(range(len(x_test))):
-		newxtest.append( resize(x_test[i], size) )
+		newxtest.append( gray2rgb(resize(x_test[i], size)) )
 	x_test = np.asarray(newxtest)
 	
 	train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
