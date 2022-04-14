@@ -24,6 +24,15 @@ from keras.datasets import cifar10    #small images
 print("Done!")
 
 def main(args):
+	# ~ preamble()
+	
+	print("heh")
+
+
+	return 0
+
+
+def preamble():
 	print("Hello lol!")
 	
 	layer = keras.layers.Dense(3)
@@ -183,10 +192,6 @@ def main(args):
 	
 	
 	print("\n\n\n\n#########################################################")
-
-
-
-	return 0
 
 
 if __name__ == '__main__':
