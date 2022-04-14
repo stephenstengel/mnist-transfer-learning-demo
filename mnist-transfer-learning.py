@@ -16,6 +16,7 @@
 print("Running imports...")
 
 import os
+import time
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -26,18 +27,133 @@ from keras.datasets import cifar10    #small images
 import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from skimage.transform import resize, rescale
 
 print("Done!")
 
 def main(args):
+	print("Hello!")
+
 	# ~ preamble()
+	epochsCat = 5
+	# ~ xceptCatDog(epochsCat)
 	
-	print("heh")
-	xceptCatDog()
+	epochsMnist = 2
+	xceptionOnMnistExample(epochsMnist, fashion_mnist)
 
 	return 0
 
-def xceptCatDog():
+
+#Example of using xception network with imagenet weights to do transfer
+#learning on mnist. I'll cut down the classesin MNIST to just two to 
+#more closely match the tutorial I'm following and to match the problem
+#that we will be solving for the project.
+def xceptionOnMnistExample(epochsMnist, myDataset):
+	print("Creating datasets...")
+	############# work area
+	
+	train_ds, validation_ds = readDataset(myDataset)
+	
+	print("Done!")
+	
+	
+	
+	print("Looking at a few of the images...")
+	plt.figure(figsize=(10, 10))
+	for images, labels in train_ds.take(1):
+		for i in tqdm(range(9)):
+			ax = plt.subplot(3, 3, i + 1)
+			plt.imshow(images[i].numpy().astype("float32"))
+			plt.title(int(labels[i]))
+			plt.axis("off")
+	plt.show() #THis line is needed for the pictures to actually show.
+	print("Done!")
+	
+	############### unchanged below
+	
+	
+	print("Done!")
+	print("HORAAAAAYYYYY")
+	
+
+#This reads the specified dataset into memory.
+#Try: mnist, fashion_mnist, cifar10
+def readDataset( myDataset ):
+	print("Start reading the data ...")
+	# Get the time
+	StartTime = time.time()
+	(x_train, y_train), (x_test, y_test) = myDataset.load_data()
+	
+	#testing
+	cutNum = 1000
+	x_train = x_train[:cutNum]
+	y_train = y_train[:cutNum]
+	x_test = x_test[:cutNum]
+	y_test = y_test[:cutNum]
+	
+	# ~ x_train = x_train.astype('float32') / 255.
+	# ~ x_test = x_test.astype('float32') / 255.
+	
+	print("SHAPES:...")
+	print(x_train.shape,y_train.shape)
+	print(x_test.shape, y_test.shape)
+	
+	size = (150, 150)
+	# ~ size = (28, 28)
+	newxtrain = []
+	for i in tqdm(range(len(x_train))):
+		newxtrain.append(resize(x_train[i], size) )
+	x_train = np.asarray(newxtrain)
+	newxtest = []
+	for i in tqdm(range(len(x_test))):
+		newxtest.append( resize(x_test[i], size) )
+	x_test = np.asarray(newxtest)
+	
+	train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+	val_ds   = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+	
+	BATCH_SIZE = 64
+	# ~ dataset = dataset.repeat().batch(BATCH_SIZE)
+	train_ds = train_ds.repeat().batch(BATCH_SIZE, drop_remainder=False) ############
+	val_ds = val_ds.repeat().batch(BATCH_SIZE, drop_remainder=False)
+	
+	
+	
+	# ~ print("x_train: " + str(x_train))
+	# ~ print("x_test: " + str(x_test))
+	# ~ print("train_ds: " + str(x_train))
+	# ~ print("val_ds: " + str(x_test))
+	
+	size = (150, 150)
+	# ~ train_ds = train_ds.map(lambda x, y: (tf.image.resize(x, size), y)) ###############
+	# ~ val_ds = val_ds.map(lambda x, y: (tf.image.resize(x, size), y))
+	
+	# ~ print("x_train: " + str(x_train))
+	# ~ print("x_test: " + str(x_test))
+	# ~ print("train_ds: " + str(x_train))
+	# ~ print("val_ds: " + str(x_test))
+
+	# ~ x_train = x_train.prefetch(buffer_size=32)
+	# ~ x_test = x_test.prefetch(buffer_size=32)
+	train_ds = train_ds.prefetch(buffer_size=32)
+	val_ds = val_ds.prefetch(buffer_size=32)
+	
+	#Get the time
+	EndTime = time.time()
+	print("Elapsed time to read dataset into memory: ", EndTime-StartTime)
+	
+	# ~ return x_train, x_test
+	# ~ return (x_train, y_train), (x_test, y_test)
+	print("WORKSOFAR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+	return train_ds, val_ds
+
+
+#Example of using a pretrained network with weights, adding a bit to the
+#model, and training on a new dataset. This example loads weights from
+#imagenet and puts them in a xception network. Then it adds a few
+#layers, changes to create binary output, and runs against the
+#cats_vs_dogs dataset.
+def xceptCatDog(epochsCat):
 	#Starting by importing the dataset manually because the first tutorial just doesn't compile.
 	#Using this other tutorial: https://keras.io/examples/vision/image_classification_from_scratch/
 	
@@ -86,6 +202,7 @@ def xceptCatDog():
 	)
 	
 	print("Done!")
+	print("train_ds: " + str(train_ds) + " ##################################################")
 	
 	# ~ print("Looking at a few of the images...")
 	# ~ plt.figure(figsize=(10, 10))
@@ -125,6 +242,7 @@ def xceptCatDog():
 	# ~ val_ds = val_ds.prefetch(buffer_size=32)
 	
 	size = (150, 150)
+	print("train_ds before resize: " + str(train_ds))
 	train_ds = train_ds.map(lambda x, y: (tf.image.resize(x, size), y))
 	validation_ds = val_ds.map(lambda x, y: (tf.image.resize(x, size), y)) #RENAME val_ds
 
@@ -203,14 +321,29 @@ def xceptCatDog():
 		metrics=[keras.metrics.BinaryAccuracy()],
 	)
 	
-	epochs = 20
+	# ~ epochs = 20
+	epochs = epochsCat
 	print("train_ds: " + str(train_ds))
 	# ~ print("train_ds shape: " + str(train_ds.shape))
 	model.fit(train_ds, epochs=epochs, validation_data=validation_ds)
 	
 	print("Done!")
+	image_size = (150, 150)
+	img = keras.preprocessing.image.load_img(
+		"PetImages/Cat/6779.jpg", target_size=image_size
+	)
+	img_array = keras.preprocessing.image.img_to_array(img)
+	img_array = tf.expand_dims(img_array, 0)  # Create batch axis
 	
-
+	predictions = model.predict(img_array)
+	score = predictions[0]
+	print("predictions: " + str(predictions))
+	print("score: " + str(score))
+	print(
+		"This image is %.2f percent cat and %.2f percent dog."
+		% (100 * (1 - score), 100 * score)
+	)
+	
 
 #an xception model.
 def make_model(input_shape, num_classes):
