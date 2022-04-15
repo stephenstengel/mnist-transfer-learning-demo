@@ -24,7 +24,6 @@ from tensorflow.keras import layers
 from keras.datasets import mnist		#images of digits.
 from keras.datasets import fashion_mnist  #images of clothes
 from keras.datasets import cifar10    #small images
-# ~ import tensorflow_datasets as tfds
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from skimage.transform import resize, rescale
@@ -32,6 +31,9 @@ from skimage.color import gray2rgb
 from sklearn.model_selection import train_test_split
 
 print("Done!")
+
+IS_GLOBAL_PRINTING_ON = True
+# ~ IS_GLOBAL_PRINTING_ON = False
 
 def main(args):
 	print("Hello!")
@@ -41,13 +43,12 @@ def main(args):
 	fFolder = "./fashion/"
 	os.system("mkdir -p " + fFolder)
 	
-	
 	# ~ preamble()
-	epochsCat = 5
+	# ~ epochsCat = 10
 	# ~ xceptCatDog(epochsCat)
 	
-	epochsMnist = 100
-	sliceNum = 2000
+	epochsMnist = 2
+	sliceNum = 200 #Min 200 to prevent a bug in "printSomeOfDataset()" 
 	xceptionOnMnistExample(epochsMnist, fashion_mnist, fFolder, sliceNum)
 	xceptionOnMnistExample(epochsMnist, mnist, dFolder, sliceNum)
 
@@ -55,34 +56,59 @@ def main(args):
 
 
 #Example of using xception network with imagenet weights to do transfer
-#learning on mnist. I'll cut down the classesin MNIST to just two to 
+#learning on mnist. I'll cut down the classes in MNIST to just two to 
 #more closely match the tutorial I'm following and to match the problem
-#that we will be solving for the project.
+#that we will be solving for the project. HEHE
 def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder, sliceNum):
 	print("Creating datasets...")
-	############# work area
 	
 	train_ds, validation_ds, test_ds = readDataset(myDataset, sliceNum)
 	
 	print("Done!")
 	
-	
-	############# this is the good one ################################################# good useful
-	# ~ print("Looking at a few of the images...")
-	# ~ plt.figure(figsize=(10, 10))
-	# ~ for images, labels in train_ds.take(1):
-		# ~ for i in tqdm(range(9)):
-			# ~ ax = plt.subplot(3, 3, i + 1)
-			# ~ plt.imshow(images[i].numpy().astype("float32"))
-			# ~ plt.title(int(labels[i]))
-			# ~ plt.axis("off")
-	# ~ plt.show() #THis line is needed for the pictures to actually show.
-	
-	print("Done!")
-	############################################
+	if IS_GLOBAL_PRINTING_ON:
+		print("Showing some images from the dataset...")
+		printSomeOfDataset(train_ds)
+		printSomeOfDataset(validation_ds)
+		printSomeOfDataset(test_ds)
+		print("Done!")
 
-	print("Done!")
 	print("Making the model...")
+	model = makeTheModel()
+	print("Done!")
+
+
+	print("Training top layer...")
+	
+	epochs = epochsMnist
+	if IS_GLOBAL_PRINTING_ON:
+		print("train_ds: " + str(train_ds))
+	myHistory = model.fit(train_ds, epochs=epochs, validation_data=validation_ds)
+	
+	print("Done!")
+	
+	predictStuff(model, test_ds)
+
+	performEvaluation(myHistory, tmpFolder, model, test_ds)
+	
+	print("HORAAAAAYYYYY")
+	
+
+
+def predictStuff(model, the_ds ):
+	predictions = model.predict(the_ds)
+	score = predictions[0]
+	if IS_GLOBAL_PRINTING_ON:
+		print("predictions: " + str(predictions))
+	print("score: " + str(score))
+	#This is buggy. Maybe was made for a different type of score.
+	print(
+		"This image is %.2f percent thing and %.2f percent thing2."
+		% (100 * (1 - score), 100 * score)
+	)
+
+
+def makeTheModel():
 	base_model = keras.applications.Xception(
 		weights="imagenet",  # Load weights pre-trained on ImageNet.
 		input_shape=(150, 150, 3),
@@ -92,10 +118,8 @@ def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder, sliceNum):
 	# Freeze the base_model
 	base_model.trainable = False
 	
-	# Create new model on top
+	# Create new layers on top of the old model
 	inputs = keras.Input(shape=(150, 150, 3))
-	# ~ x = data_augmentation(inputs)  # Apply random data augmentation
-	# ~ x = inputs
 	x = layers.experimental.preprocessing.RandomFlip("horizontal")(inputs)
 	
 	# Pre-trained Xception weights requires that input be scaled
@@ -114,52 +138,26 @@ def xceptionOnMnistExample(epochsMnist, myDataset, tmpFolder, sliceNum):
 	model = keras.Model(inputs, outputs)
 	
 	model.summary()
-		
 	
-	
-	print("Done!")
-	
-	
-	#train
-	print("Training top layer...")
 	model.compile(
 		optimizer=keras.optimizers.Adam(),
 		loss=keras.losses.BinaryCrossentropy(from_logits=True),
 		metrics=[keras.metrics.BinaryAccuracy()],
 	)
 	
-	# ~ epochs = 20
-	epochs = epochsMnist
-	print("train_ds: " + str(train_ds))
-	# ~ print("train_ds shape: " + str(train_ds.shape))
-	myHistory = model.fit(train_ds, epochs=epochs, validation_data=validation_ds)
-	
-	print("Done!")
-	# ~ image_size = (150, 150)
-	# ~ img = keras.preprocessing.image.load_img(
-		# ~ "PetImages/Cat/6779.jpg", target_size=image_size ##################THIS NEEDS TO BE A FASHION
-	# ~ )
-	# ~ img_array = keras.preprocessing.image.img_to_array(img)
-	# ~ img_array = tf.expand_dims(img_array, 0)  # Create batch axis
-	
-	# ~ predictions = model.predict(img_array)
-	predictions = model.predict(test_ds)
-	score = predictions[0]
-	print("predictions: " + str(predictions))
-	print("score: " + str(score))
-	print(
-		"This image is %.2f percent thing and %.2f percent thing2."
-		% (100 * (1 - score), 100 * score)
-	)
-	
-	scores = model.evaluate(test_ds)
-	print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
-	
-	performEvaluation(myHistory, tmpFolder)
-	
-	############################################
-	print("HORAAAAAYYYYY")
-	
+	return model
+
+#prints a few images from a loaded dataset.
+def printSomeOfDataset(myDataset):
+	print("Looking at a few of the images...")
+	plt.figure(figsize=(10, 10))
+	for images, labels in myDataset.take(1):
+		for i in tqdm(range(9)):
+			ax = plt.subplot(3, 3, i + 1)
+			plt.imshow(images[i].numpy().astype("float32"))
+			plt.title(int(labels[i]))
+			plt.axis("off")
+	plt.show()
 
 #This reads the specified dataset into memory.
 #Try: mnist, fashion_mnist, cifar10
@@ -169,14 +167,16 @@ def readDataset( myDataset, sliceNum ):
 	StartTime = time.time()
 	(x_train, y_train), (x_test, y_test) = myDataset.load_data()
 	
+	#I remember shuffling pairs of numpy arrays once using a random order list and zip() or something like that.
+	#Can't shuffle here because the arrays are nonwriteable. 
 	# ~ rng = np.random.default_rng()
 	# ~ rng.shuffle(x_train)
 	# ~ rng.shuffle(y_train)
 	# ~ rng.shuffle(x_test)
 	# ~ rng.shuffle(y_test)
 	
-	#testing ######################################## cut set ######################################
-	#Full set is too much memory with these lists
+	#Full set is too much memory with these LISTS coming up below.
+	#Currently slice of 30000 is a bit under 15GB
 	cutNum = sliceNum
 	x_train = x_train[:cutNum]
 	y_train = y_train[:cutNum]
@@ -185,106 +185,89 @@ def readDataset( myDataset, sliceNum ):
 	#######
 	
 	#make validation set from training data.
-	sliceidx = int(len(x_train) * 0.8)
-	x_val = x_train[sliceidx:]
-	x_train = x_train[:sliceidx]
+	splitDecimal = 0.8
+	x_train, x_val = valTrainSplit(x_train, splitDecimal)
+	y_train, y_val = valTrainSplit(y_train, splitDecimal)
 	
-	sliceidx = int(len(y_train) * 0.8)
-	y_val = y_train[sliceidx:]
-	y_train = y_train[:sliceidx]
-	
-	
-	
-	
-	print("SHAPES:...")
-	print(x_train.shape,y_train.shape)
-	print(x_test.shape, y_test.shape)
-	print(x_val.shape, y_val.shape)
-	
+	if IS_GLOBAL_PRINTING_ON:
+		print("SHAPES:...")
+		print(x_train.shape,y_train.shape)
+		print(x_test.shape, y_test.shape)
+		print(x_val.shape, y_val.shape)
+
+	#I just picked these things at random.
 	ANKLE_BOOT = 9
 	T_SHIRT = 0
+	firstClass = ANKLE_BOOT
+	secondClass = T_SHIRT
 	
+	#This is very slow because I put them in lists before converting to numpy arrays.
+	#TODO: remember how to do that numpy extend thing. ##################################################!
 	size = (150, 150)
-	# ~ size = (28, 28)
-	newxtrain = []
-	newytrain = []
-	for i in tqdm(range(len(x_train))):
-		if y_train[i] == ANKLE_BOOT or y_train[i] == T_SHIRT:
-			# ~ print("ankle boot lol")
-			newxtrain.append(gray2rgb(resize(x_train[i], size)) )
-			newytrain.append(y_train[i])
-	x_train = np.asarray(newxtrain)
-	y_train = np.asarray(newytrain)
-
-	newxtest = []
-	newytest = []
-	for i in tqdm(range(len(x_test))):
-		if y_test[i] == ANKLE_BOOT or y_test[i] == T_SHIRT:
-			newxtest.append( gray2rgb(resize(x_test[i], size)) )
-			newytest.append(y_test[i])
-	x_test = np.asarray(newxtest)
-	y_test = np.asarray(newytest)
-
-	newxval = []
-	newyval = []
-	for i in tqdm(range(len(x_val))):
-		if y_val[i] == ANKLE_BOOT or y_val[i] == T_SHIRT:
-			newxval.append( gray2rgb(resize(x_val[i], size)) )
-			newyval.append(y_val[i])
-	x_val = np.asarray(newxval)
-	y_val = np.asarray(newyval)
+	x_train, y_train = keepTwoClasses(x_train, y_train, firstClass, secondClass, size)
+	x_test, y_test = keepTwoClasses(x_test, y_test, firstClass, secondClass, size)
+	x_val, y_val = keepTwoClasses(x_val, y_val, firstClass, secondClass, size)
+	
+	if IS_GLOBAL_PRINTING_ON:
+		print("SHAPES after selection of two classes...")
+		print(x_train.shape,y_train.shape)
+		print(x_test.shape, y_test.shape)
+		print(x_val.shape, y_val.shape)
 	
 	
-	print("SHAPES after selection of two classes...")
-	print(x_train.shape,y_train.shape)
-	print(x_test.shape, y_test.shape)
-	print(x_val.shape, y_val.shape)
-	
-	#lengths must be same?
-	
-	train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-	val_ds   = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+	## ! NOTE THE NAME CHANGE ! ##
+	# x_test, y_test becomes val_ds
+	# x_val, y_val becomes realval_ds
+	# I can change these names to be more consistent with the return order later.
+	train_ds     = tf.data.Dataset.from_tensor_slices((x_train, y_train))
+	val_ds       = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 	realval_ds   = tf.data.Dataset.from_tensor_slices((x_val, y_val))
 	
+
 	BATCH_SIZE = 64
-	# ~ train_ds = train_ds.repeat().batch(BATCH_SIZE, drop_remainder=False) ############
-	# ~ val_ds = val_ds.repeat().batch(BATCH_SIZE, drop_remainder=False)
-	train_ds = train_ds.batch(BATCH_SIZE, drop_remainder=False) ############
+	train_ds = train_ds.batch(BATCH_SIZE, drop_remainder=False)
 	val_ds = val_ds.batch(BATCH_SIZE, drop_remainder=False)
 	realval_ds = realval_ds.batch(BATCH_SIZE, drop_remainder=False)
 	
 	
-	
-	# ~ print("x_train: " + str(x_train))
-	# ~ print("x_test: " + str(x_test))
-	# ~ print("train_ds: " + str(x_train))
-	# ~ print("val_ds: " + str(x_test))
-	
-	size = (150, 150)
-	# ~ train_ds = train_ds.map(lambda x, y: (tf.image.resize(x, size), y)) ###############
-	# ~ val_ds = val_ds.map(lambda x, y: (tf.image.resize(x, size), y))
-	
-	# ~ print("x_train: " + str(x_train))
-	# ~ print("x_test: " + str(x_test))
-	# ~ print("train_ds: " + str(x_train))
-	# ~ print("val_ds: " + str(x_test))
-
-	# ~ x_train = x_train.prefetch(buffer_size=32)
-	# ~ x_test = x_test.prefetch(buffer_size=32)
 	train_ds = train_ds.prefetch(buffer_size=32)
 	val_ds = val_ds.prefetch(buffer_size=32)
 	realval_ds = realval_ds.prefetch(buffer_size=32)
 	
 	#Get the time
 	EndTime = time.time()
-	print("Elapsed time to read dataset into memory: ", EndTime-StartTime)
+	print("Elapsed time to read dataset into memory: ", EndTime - StartTime)
 	
-	# ~ return x_train, x_test
-	# ~ return (x_train, y_train), (x_test, y_test)
 	print("WORKSOFAR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 	
 	#realval_ds is the dataset for validation. val_ds is actually the test set. change names later.
 	return train_ds, realval_ds, val_ds
+
+
+#Keeps only two classes out of a total dataset.
+#In need of optimization.
+def keepTwoClasses(x_train, y_train, firstClass, secondClass, size):
+	newxtrain = []
+	newytrain = []
+	for i in tqdm(range(len(x_train))):
+		if y_train[i] == firstClass or y_train[i] == secondClass:
+			# ~ print("ankle boot lol")
+			newxtrain.append(gray2rgb(resize(x_train[i], size)) )
+			newytrain.append(y_train[i])
+	x_train = np.asarray(newxtrain)
+	y_train = np.asarray(newytrain)
+	
+	return x_train, y_train
+
+
+#Split a validation set from the training set.
+#There is already a test set created by the mnist loading function.
+def valTrainSplit(x_train, splitDecimal):
+	sliceidx = int(len(x_train) * splitDecimal)
+	x_val = x_train[sliceidx:]
+	x_train = x_train[:sliceidx]
+	
+	return x_train, x_val
 
 
 #Example of using a pretrained network with weights, adding a bit to the
@@ -484,8 +467,8 @@ def xceptCatDog(epochsCat):
 	)
 	
 
-#an xception model.
-def make_model(input_shape, num_classes):
+#an xception model from a tutorial-- UNUSED
+def make_modelUNUSED(input_shape, num_classes):
 	inputs = keras.Input(shape=input_shape)
 	# Image augmentation block
 	# ~ x = data_augmentation(inputs) #BUGGY
@@ -542,6 +525,7 @@ def make_model(input_shape, num_classes):
 	return keras.Model(inputs, outputs)
 
 
+#Script containing stuff from a tutorial
 def preamble():
 	print("Hello lol!")
 	
@@ -703,13 +687,19 @@ def preamble():
 	
 	print("\n\n\n\n#########################################################")
 
-#my evaluation grapher thingy
-def performEvaluation(history, tmpFolder):
-	print("Performing evaluation...###############################################################")
-	print("history...")
-	print(history)
-	print("history.history...")
-	print(history.history)
+
+#my evaluation grapher thingy. Saves graphs to file.
+def performEvaluation(history, tmpFolder, model, test_ds):
+	print("Performing evaluation...")
+	
+	scores = model.evaluate(test_ds)
+	
+	if IS_GLOBAL_PRINTING_ON:
+		print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
+		print("history...")
+		print(history)
+		print("history.history...")
+		print(history.history)
 	
 	accuracy = history.history["binary_accuracy"]
 	val_accuracy = history.history["val_binary_accuracy"]
@@ -719,8 +709,6 @@ def performEvaluation(history, tmpFolder):
 	epochs = range(1, len(accuracy) + 1)
 	plt.plot(epochs, accuracy, "o", label="Training accuracy")
 	plt.plot(epochs, val_accuracy, "^", label="Validation accuracy")
-	# ~ plt.plot(epochs, jaccInd, "*", label="Jaccard Index")
-	# ~ plt.plot(epochs, diceInd, "D", label="Dice Index")
 	plt.title("Training and validation accuracy")
 	plt.legend()
 	plt.savefig(tmpFolder + "trainvalacc.png")
