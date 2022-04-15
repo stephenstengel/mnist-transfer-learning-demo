@@ -12,6 +12,8 @@
 # ~ https://towardsdatascience.com/transfer-learning-using-pre-trained-alexnet-model-and-fashion-mnist-43898c2966fb?gi=1f9cc1728578
 # ~ https://www.kaggle.com/code/muerbingsha/mnist-vgg19/notebook
 
+## ! Training on mnist and then using those weights in a fashion_mnist
+## ! model would be a way easier tutorial. or cifar10
 
 print("Running imports...")
 
@@ -23,10 +25,10 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from keras.datasets import mnist		#images of digits.
 from keras.datasets import fashion_mnist  #images of clothes
-from keras.datasets import cifar10    #small images
+# ~ from keras.datasets import cifar10    #small images
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from skimage.transform import resize, rescale
+from skimage.transform import resize
 from skimage.color import gray2rgb
 from sklearn.model_selection import train_test_split
 
@@ -42,6 +44,8 @@ GLOBAL_DEFAULT_EPOCHS = 100
 def main(args):
 	print("Hello!")
 
+	#If I check args before imports, it will be faster.
+	#Just save returns to their globals.
 	sliceNum, epochsMnist = checkArgs(args)
 	
 	if IS_GLOBAL_PRINTING_ON:
@@ -53,8 +57,6 @@ def main(args):
 	os.system("mkdir -p " + dFolder)
 	fFolder = "./fashion/"
 	os.system("mkdir -p " + fFolder)
-	cFolder = "./cfar/"
-	os.system("mkdir -p " + cFolder)
 	
 	# ~ preamble()
 	# ~ epochsCat = 10
@@ -62,7 +64,7 @@ def main(args):
 	
 	xceptionOnMnistExample(epochsMnist, mnist, dFolder, sliceNum)
 	xceptionOnMnistExample(epochsMnist, fashion_mnist, fFolder, sliceNum)
-	xceptionOnMnistExample(epochsMnist, cifar10, cFolder, sliceNum)
+	# ~ xceptionOnMnistExample(epochsMnist, cifar10, cFolder, sliceNum)
 
 	return 0
 
