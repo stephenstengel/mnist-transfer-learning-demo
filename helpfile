@@ -1,0 +1,20 @@
+This program builds a few layers on top of an xception model using
+pre-trained weights from imagenet. It then uses this model to train a
+bit on a MNIST-compatable dataset. Putting anything in the third
+argument spot will enable printing of debug stuff.
+
+Usage:
+    python3 mnist-transfer-learning.py sliceNumber epochs
+
+sliceNumber is the max number of pictures to load from mnist.
+epochs is the epochs of the training
+
+Examples:
+    python3 mnist-transfer-learning.py 200 2
+    python3 mnist-transfer-learning.py 2000 100
+    python3 mnist-transfer-learning.py 60000 50
+    python3 mnist-transfer-learning.py 60000 50 anything
+    python3 mnist-transfer-learning.py 60000 50 printplease
+    python3 mnist-transfer-learning.py 60000 50 42
+
+2022 Stephen Stengel <stephen.stengel@cwu.edu>
