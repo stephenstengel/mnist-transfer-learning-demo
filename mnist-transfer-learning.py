@@ -32,27 +32,77 @@ from sklearn.model_selection import train_test_split
 
 print("Done!")
 
-IS_GLOBAL_PRINTING_ON = True
-# ~ IS_GLOBAL_PRINTING_ON = False
+IS_GLOBAL_PRINTING_ON = False
+
+HELPFILE_PATH = "helpfile"
+
+GLOBAL_DEFAULT_SLICE = 2000
+GLOBAL_DEFAULT_EPOCHS = 100
 
 def main(args):
 	print("Hello!")
+
+	sliceNum, epochsMnist = checkArgs(args)
+	
+	if IS_GLOBAL_PRINTING_ON:
+		print("global printing true")
+		print("sliceNum: %d" % sliceNum)
+		print("epochsNum: %d" % epochsMnist)
 
 	dFolder = "./digits/"
 	os.system("mkdir -p " + dFolder)
 	fFolder = "./fashion/"
 	os.system("mkdir -p " + fFolder)
+	cFolder = "./cfar/"
+	os.system("mkdir -p " + cFolder)
 	
 	# ~ preamble()
 	# ~ epochsCat = 10
 	# ~ xceptCatDog(epochsCat)
 	
-	epochsMnist = 2
-	sliceNum = 200 #Min 200 to prevent a bug in "printSomeOfDataset()" 
-	xceptionOnMnistExample(epochsMnist, fashion_mnist, fFolder, sliceNum)
 	xceptionOnMnistExample(epochsMnist, mnist, dFolder, sliceNum)
+	xceptionOnMnistExample(epochsMnist, fashion_mnist, fFolder, sliceNum)
+	xceptionOnMnistExample(epochsMnist, cifar10, cFolder, sliceNum)
 
 	return 0
+
+
+#Check if user wants help
+def checkArgs(args):
+	helpList = ["help", "-help", "--help", "-h", "--h", "wtf", "-wtf", "--wtf"]
+	argLen = len(args)
+	if argLen >= 1:
+		for a in args:
+			if str(a).lower() in helpList:
+				printFile(HELPFILE_PATH)
+				sys.exit(0)
+	if argLen == 1:
+		return GLOBAL_DEFAULT_SLICE, GLOBAL_DEFAULT_EPOCHS
+	if argLen == 2:
+		print("bad input")
+		printFile(HELPFILE_PATH)
+		sys.exit(-1)
+	if argLen == 3:
+		theSlice = int(sys.argv[1])
+		theEpochs = int(sys.argv[2])
+		return theSlice, theEpochs
+	if argLen == 4:
+		theSlice = int(sys.argv[1])
+		theEpochs = int(sys.argv[2])
+		global IS_GLOBAL_PRINTING_ON
+		IS_GLOBAL_PRINTING_ON = True
+		return theSlice, theEpochs
+	if argLen > 4:
+		print("bad input")
+		printFile(HELPFILE_PATH)
+		sys.exit(-1)
+		
+		
+#Prints a text file to screen
+def printFile(myFilePath):
+	with open(myFilePath, "r") as helpfile:
+		for line in helpfile:
+			print(line, end = "")
 
 
 #Example of using xception network with imagenet weights to do transfer
